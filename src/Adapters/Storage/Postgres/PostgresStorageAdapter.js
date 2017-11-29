@@ -664,6 +664,42 @@ export class PostgresStorageAdapter {
       });
   }
 
+  setIndexesFromPostgres(className) {
+    return this.getIndexes(className).then((indexes) => {
+      indexes = indexes.reduce((obj, index) => {
+        // Get field from index definition
+        const indexdef = index.indexdef.replace(/[\"]/g, "");
+        const regExp = /\(([^)]+)\)/;
+        let name = index.indexname;
+        const value = regExp.exec(indexdef)[1];
+        const fields = value.split(', ');
+        let key = {};
+        fields.forEach((field) => {
+          if (field === 'objectId') {
+            key = { _id: 1 };
+            name = '_id_';
+            return;
+          }
+          const textIndex = `${field}_text`;
+          if (name.includes(textIndex)) {
+            key[field] = 'text';
+          } else {
+            key[field] = 1;
+          }
+        });
+        obj[name] = key;
+        return obj;
+      }, {});
+      return this._ensureSchemaCollectionExists().then(() => {
+        const values = [className, 'schema', 'indexes', JSON.stringify(indexes)]
+        return this._client.none(`UPDATE "_SCHEMA" SET $2:name = json_object_set_key($2:name, $3::text, $4::jsonb) WHERE "className"=$1 `, values);
+      });
+    }).catch(() => {
+      // Ignore if collection not found
+      return Promise.resolve();
+    });
+  }
+
   createClass(className, schema) {
     return this._client.tx(t => {
       const q1 = this.createTable(className, schema, t);
@@ -1606,6 +1642,15 @@ export class PostgresStorageAdapter {
       });
   }
 
+  createIndex(className, index, conn) {
+    const indexNames = [];
+    for (const key in index) {
+      indexNames.push(`${key}_${index[key]}`);
+    }
+    const values = [indexNames.join('_'), className, index];
+    return (conn || this._client).none('CREATE INDEX $1:name ON $2:name ($3:name)', values);
+  }
+
   createIndexes(className, indexes, conn) {
     return (conn || this._client).tx(t => t.batch(indexes.map(i => {
       return t.none('CREATE INDEX $1:name ON $2:name ($3:name)', [i.name, className, i.key]);
@@ -1616,13 +1661,19 @@ export class PostgresStorageAdapter {
     return (conn || this._client).tx(t => t.batch(indexes.map(i => t.none('DROP INDEX $1:name', i))));
   }
 
-  getIndexes(className) {
+  getIndexes(className, conn) {
     const qs = 'SELECT * FROM pg_indexes WHERE tablename = ${className}';
-    return this._client.any(qs, {className});
+    return (conn || this._client).any(qs, {className});
   }
 
   updateSchemaWithIndexes() {
-    return Promise.resolve();
+    return this.getAllClasses()
+      .then((classes) => {
+        const promises = classes.map((schema) => {
+          return this.setIndexesFromPostgres(schema.className);
+        });
+        return Promise.all(promises);
+      });
   }
 }
 
