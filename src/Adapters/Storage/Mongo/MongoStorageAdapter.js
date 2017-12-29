@@ -208,6 +208,7 @@ export class MongoStorageAdapter {
     if (insertedIndexes.length > 0) {
       insertPromise = this.createIndexes(className, insertedIndexes);
     }
+    // console.log(existingIndexes);
     return Promise.all(deletePromises)
       .then(() => insertPromise)
       .then(() => this._schemaCollection())
@@ -235,7 +236,13 @@ export class MongoStorageAdapter {
     return this.setIndexesWithSchemaFormat(className, schema.indexes, {}, schema.fields)
       .then(() => this._schemaCollection())
       .then(schemaCollection => schemaCollection._collection.insertOne(mongoObject))
-      .then(result => MongoSchemaCollection._TESTmongoSchemaToParseSchema(result.ops[0]))
+      .then(result => {
+        schema.indexes._id_ = { _id: 1 };
+        console.log(schema.indexes);
+        // result.ops[0]._metadata.indexes = { _id_: { _id: 1 } };
+        // console.log(result);
+        return MongoSchemaCollection._TESTmongoSchemaToParseSchema(result.ops[0]);
+      })
       .catch(error => {
         if (error.code === 11000) { //Mongo's duplicate key error
           throw new Parse.Error(Parse.Error.DUPLICATE_VALUE, 'Class already exists.');
