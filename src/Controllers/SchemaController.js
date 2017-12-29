@@ -580,6 +580,7 @@ export default class SchemaController {
         return this.reloadData({ clearCache: true });
       })
       .then(() => {
+      //  console.log(this.data);
       // Ensure that the schema now validates
         if (this.data[className]) {
           return this;

@@ -216,19 +216,8 @@ export class MongoStorageAdapter {
       }));
   }
 
-  setIndexesFromMongo(className) {
+  setIndexesFromDB(className) {
     return this.getIndexes(className).then((indexes) => {
-      indexes = indexes.reduce((obj, index) => {
-        if (index.key._fts) {
-          delete index.key._fts;
-          delete index.key._ftsx;
-          for (const field in index.weights) {
-            index.key[field] = 'text';
-          }
-        }
-        obj[index.name] = index.key;
-        return obj;
-      }, {});
       return this._schemaCollection()
         .then(schemaCollection => schemaCollection.updateSchema(className, {
           $set: { _metadata: { indexes: indexes } }
@@ -572,7 +561,7 @@ export class MongoStorageAdapter {
       return this.setIndexesWithSchemaFormat(className, textIndex, existingIndexes, schema.fields)
         .catch((error) => {
           if (error.code === 85) { // Index exist with different options
-            return this.setIndexesFromMongo(className);
+            return this.setIndexesFromDB(className);
           }
           throw error;
         });
@@ -582,7 +571,20 @@ export class MongoStorageAdapter {
 
   getIndexes(className) {
     return this._adaptiveCollection(className)
-      .then(collection => collection._mongoCollection.indexes());
+      .then(collection => collection._mongoCollection.indexes())
+      .then(indexes => {
+        return indexes.reduce((obj, index) => {
+          if (index.key._fts) {
+            delete index.key._fts;
+            delete index.key._ftsx;
+            for (const field in index.weights) {
+              index.key[field] = 'text';
+            }
+          }
+          obj[index.name] = index.key;
+          return obj;
+        }, {});
+      });
   }
 
   dropIndex(className, index) {
@@ -599,7 +601,7 @@ export class MongoStorageAdapter {
     return this.getAllClasses()
       .then((classes) => {
         const promises = classes.map((schema) => {
-          return this.setIndexesFromMongo(schema.className);
+          return this.setIndexesFromDB(schema.className);
         });
         return Promise.all(promises);
       });
