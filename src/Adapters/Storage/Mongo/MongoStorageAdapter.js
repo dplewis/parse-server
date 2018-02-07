@@ -538,6 +538,9 @@ export class MongoStorageAdapter implements StorageAdapter {
           }
         }
       }
+      if (stage.$sample && stage.$sample.hasOwnProperty('scan')) {
+        delete stage.$sample.scan;
+      }
       return stage;
     });
     readPreference = this._parseReadPreference(readPreference);

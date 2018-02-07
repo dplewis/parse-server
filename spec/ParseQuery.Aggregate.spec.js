@@ -478,6 +478,48 @@ describe('Parse.Query Aggregate testing', () => {
       }).catch(done.fail);
   });
 
+  fit('random', (done) => {
+    const options = Object.assign({}, masterKeyOptions, {
+      body: {
+        sample: { size: 2 },
+      }
+    });
+    rp.get(Parse.serverURL + '/aggregate/TestObject', options)
+      .then((resp) => {
+        expect(resp.results.length).toBe(2);
+        console.log(resp.results);
+        done();
+      }).catch(done.fail);
+  });
+
+  fit('random no scan', (done) => {
+    const options = Object.assign({}, masterKeyOptions, {
+      body: {
+        sample: { size: 2, scan: false },
+      }
+    });
+    rp.get(Parse.serverURL + '/aggregate/TestObject', options)
+      .then((resp) => {
+        expect(resp.results.length).toBe(2);
+        console.log(resp.results);
+        done();
+      }).catch(done.fail);
+  });
+
+  fit('random scan', (done) => {
+    const options = Object.assign({}, masterKeyOptions, {
+      body: {
+        sample: { size: 2, scan: true },
+      }
+    });
+    rp.get(Parse.serverURL + '/aggregate/TestObject', options)
+      .then((resp) => {
+        expect(resp.results.length).toBe(2);
+        console.log(resp.results);
+        done();
+      }).catch(done.fail);
+  });
+
   it('distinct query', (done) => {
     const options = Object.assign({}, masterKeyOptions, {
       body: { distinct: 'score' }

@@ -1509,7 +1509,9 @@ export class PostgresStorageAdapter implements StorageAdapter {
     const values = [className];
     let index = 2;
     let columns: string[] = [];
+    let buildWherePattern = [];
     let countField = null;
+    let orOrAnd = ' AND ';
     let wherePattern = '';
     let limitPattern = '';
     let skipPattern = '';
@@ -1517,6 +1519,20 @@ export class PostgresStorageAdapter implements StorageAdapter {
     let groupPattern = '';
     for (let i = 0; i < pipeline.length; i += 1) {
       const stage = pipeline[i];
+      if (stage.$sample && stage.$sample.hasOwnProperty('size')) {
+        stage.$limit = stage.$sample.size;
+        if (stage.$sample.scan) {
+          // Reads complete table then sorts.
+          // Also involves reading and writing temporary files.
+          // Should be used with small datasets < 100 objects.
+          stage.$sort = stage.$sort || {};
+          stage.$sort.random = true;
+        } else {
+          // Check for less than 5% of total objects
+          // Efficient for large datasets
+          buildWherePattern.push(`(random() < 0.05)`);
+        }
+      }
       if (stage.$group) {
         for (const field in stage.$group) {
           const value = stage.$group[field];
@@ -1575,8 +1591,7 @@ export class PostgresStorageAdapter implements StorageAdapter {
         }
       }
       if (stage.$match) {
-        const patterns = [];
-        const orOrAnd = stage.$match.hasOwnProperty('$or') ? ' OR ' : ' AND ';
+        orOrAnd = stage.$match.hasOwnProperty('$or') ? ' OR ' : ' AND ';
 
         if (stage.$match.$or) {
           const collapse = {};
@@ -1599,15 +1614,14 @@ export class PostgresStorageAdapter implements StorageAdapter {
             }
           });
           if (matchPatterns.length > 0) {
-            patterns.push(`(${matchPatterns.join(' AND ')})`);
+            buildWherePattern.push(`(${matchPatterns.join(' AND ')})`);
           }
           if (schema.fields[field] && schema.fields[field].type && matchPatterns.length === 0) {
-            patterns.push(`$${index}:name = $${index + 1}`);
+            buildWherePattern.push(`$${index}:name = $${index + 1}`);
             values.push(field, value);
             index += 2;
           }
         }
-        wherePattern = patterns.length > 0 ? `WHERE ${patterns.join(` ${orOrAnd} `)}` : '';
       }
       if (stage.$limit) {
         limitPattern = `LIMIT $${index}`;
@@ -1623,8 +1637,13 @@ export class PostgresStorageAdapter implements StorageAdapter {
         const sort = stage.$sort;
         const keys = Object.keys(sort);
         const sorting = keys.map((key) => {
+          let order = '';
+          if (key === 'random') {
+            order = 'random()';
+            return order;
+          }
           const transformer = sort[key] === 1 ? 'ASC' : 'DESC';
-          const order = `$${index}:name ${transformer}`;
+          order = `$${index}:name ${transformer}`;
           index += 1;
           return order;
         }).join();
@@ -1632,6 +1651,8 @@ export class PostgresStorageAdapter implements StorageAdapter {
         sortPattern = sort !== undefined && sorting.length > 0 ? `ORDER BY ${sorting}` : '';
       }
     }
+
+    wherePattern = buildWherePattern.length > 0 ? `WHERE ${buildWherePattern.join(` ${orOrAnd} `)}` : '';
 
     const qs = `SELECT ${columns.join()} FROM $1:name ${wherePattern} ${sortPattern} ${limitPattern} ${skipPattern} ${groupPattern}`;
     debug(qs, values);
