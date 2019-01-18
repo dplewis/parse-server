@@ -51,7 +51,10 @@ export class FilesRouter {
         .then(stream => {
           handleFileStream(stream, req, res, contentType);
         })
-        .catch(() => {
+        .catch(error => {
+          /* eslint-disable */
+          console.log('error streaming');
+          console.log(error);
           res.status(404);
           res.set('Content-Type', 'text/plain');
           res.end('File not found.');
@@ -65,7 +68,10 @@ export class FilesRouter {
           res.set('Content-Length', data.length);
           res.end(data);
         })
-        .catch(() => {
+        .catch(error => {
+          /* eslint-disable */
+          console.log('error straight');
+          console.log(error);
           res.status(404);
           res.set('Content-Type', 'text/plain');
           res.end('File not found.');
