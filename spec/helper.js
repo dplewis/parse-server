@@ -43,10 +43,15 @@ const MongoStorageAdapter = require('../lib/Adapters/Storage/Mongo/MongoStorageA
 const RedisCacheAdapter = require('../lib/Adapters/Cache/RedisCacheAdapter')
   .default;
 
+const MySQLStorageAdapter = require('parse-server-mysql-adapter');
+
 const mongoURI =
   'mongodb://localhost:27017/parseServerMongoAdapterTestDatabase';
 const postgresURI =
   'postgres://localhost:5432/parse_server_postgres_adapter_test_database';
+const mysqlURI =
+  'mysql://root@localhost:3306/parse_server_mysql_adapter_test_database';
+
 let databaseAdapter;
 // need to bind for mocking mocha
 
@@ -58,6 +63,8 @@ if (process.env.PARSE_SERVER_TEST_DB === 'postgres') {
     uri: process.env.PARSE_SERVER_TEST_DATABASE_URI || postgresURI,
     collectionPrefix: 'test_',
   });
+} else if (process.env.PARSE_SERVER_TEST_DB === 'mysql') {
+  databaseAdapter = new MySQLStorageAdapter(mysqlURI).getAdapter();
 } else {
   startDB = require('mongodb-runner/mocha/before').bind({
     timeout: () => {},
