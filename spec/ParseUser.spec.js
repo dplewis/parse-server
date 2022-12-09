@@ -1659,6 +1659,36 @@ describe('Parse.User testing', () => {
     expect(sessionToken).toBe(become.getSessionToken());
   });
 
+  fit('become user with provider does not delete sessionToken', async () => {
+    const provider = getMockFacebookProvider();
+    Parse.User._registerAuthenticationProvider(provider);
+    const user = new Parse.User();
+    user.set('username', 'testLinkWithBecome');
+    user.set('password', 'mypass');
+
+    const linkedUser = await user._linkWith('facebook', {});
+    const sessionToken = linkedUser.getSessionToken();
+
+    const query = new Parse.Query(Parse.Session);
+    query.equalTo('user', linkedUser);
+    const results = await query.find({ useMasterKey: true });
+    expect(results.length).toBe(1);
+    expect(results[0].get('sessionToken')).toBe(sessionToken);
+
+    expect(user._isLinked(provider)).toBe(true);
+    await user._unlinkFrom(provider);
+    expect(user._isLinked(provider)).toBe(false);
+
+    const become = await Parse.User.become(sessionToken);
+    expect(sessionToken).toBe(become.getSessionToken());
+
+    const sessionQuery = new Parse.Query(Parse.Session);
+    const sessions = await sessionQuery.find({ useMasterKey: true });
+    expect(sessions.length).toBe(1);
+    expect(sessions[0].get('sessionToken')).toBe(become.getSessionToken());
+    expect(sessions[0].get('sessionToken')).toBe(sessionToken);
+  });
+
   it('link with provider failed', async done => {
     const provider = getMockFacebookProvider();
     provider.shouldError = true;
