@@ -227,11 +227,17 @@ class ParseServer {
       promises.push(cacheAdapter.handleShutdown());
     }
     if (this.liveQueryServer?.server?.close) {
+      console.log(this.liveQueryServer?.server);
+      this.liveQueryServer?.server.getConnections((err, count) => {
+        console.log('Connections: ', count, err);
+      });
       promises.push(new Promise(resolve => this.liveQueryServer.server.close(resolve)));
     }
     if (this.liveQueryServer) {
       promises.push(this.liveQueryServer.shutdown());
     }
+    console.log('Shutting down Parse Server');
+    console.log(promises.length);
     return (promises.length > 0 ? Promise.all(promises) : Promise.resolve()).then(() => {
       if (this.config.serverCloseComplete) {
         this.config.serverCloseComplete();

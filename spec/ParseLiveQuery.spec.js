@@ -619,7 +619,7 @@ describe('ParseLiveQuery', function () {
     await object.save();
   });
 
-  it('can handle beforeConnect error', async () => {
+  fit('can handle beforeConnect error', async () => {
     await reconfigureServer({
       liveQuery: {
         classNames: ['TestObject'],

@@ -162,15 +162,15 @@ const destroyAliveConnections = function () {
   }
 };
 // Set up a default API server for testing with default configuration.
-let server;
-
+let parseServer;
 let didChangeConfiguration = false;
 
 // Allows testing specific configurations of Parse Server
 const reconfigureServer = async (changedConfiguration = {}) => {
-  if (server) {
-    await new Promise(resolve => server.close(resolve));
-    server = undefined;
+  if (parseServer) {
+    destroyAliveConnections();
+    await new Promise(resolve => parseServer.server.close(resolve));
+    parseServer = undefined;
     return reconfigureServer(changedConfiguration);
   }
   didChangeConfiguration = Object.keys(changedConfiguration).length !== 0;
@@ -179,20 +179,28 @@ const reconfigureServer = async (changedConfiguration = {}) => {
     port,
   });
   cache.clear();
-  const parseServer = await ParseServer.startApp(newConfiguration);
+  parseServer = await ParseServer.startApp(newConfiguration);
   console.log(parseServer.config.state);
   if (parseServer.config.state === 'initialized') {
     console.log(newConfiguration);
     console.error('Failed to initialize Parse Server');
     return reconfigureServer(newConfiguration);
   }
-  server = parseServer.server;
   Parse.CoreManager.setRESTController(RESTController);
   parseServer.expressApp.use('/1', err => {
     console.error(err);
     fail('should not call next');
   });
-  server.on('connection', connection => {
+  // parseServer.server.on('close', () => {
+  //   console.log('why we closed');
+  // });
+  // parseServer.server.on('error', () => {
+  //   console.log('why we error');
+  // });
+  // parseServer.server.on('shutdown', () => {
+  //   console.log('why we error');
+  // });
+  parseServer.server.on('connection', connection => {
     const key = `${connection.remoteAddress}:${connection.remotePort}`;
     openConnections[key] = connection;
     connection.on('close', () => {
@@ -224,64 +232,46 @@ beforeEach(() => {
   jasmine.DEFAULT_TIMEOUT_INTERVAL = process.env.PARSE_SERVER_TEST_TIMEOUT || 10000;
 });
 
-afterEach(function (done) {
-  const afterLogOut = async () => {
-    if (Object.keys(openConnections).length > 0) {
-      console.warn(`There were ${Object.keys(openConnections).length} open connections to the server left after the test finished`);
-    }
-    // destroyAliveConnections();
-    await TestUtils.destroyAllDataPermanently(true);
-    SchemaCache.clear();
-    if (didChangeConfiguration) {
-      await reconfigureServer();
-    } else {
-      await databaseAdapter.performInitialization({ VolatileClassesSchemas });
-    }
-    done();
-  };
+afterEach(async () => {
   Parse.Cloud._removeAllHooks();
   Parse.CoreManager.getLiveQueryController().setDefaultLiveQueryClient();
   defaults.protectedFields = { _User: { '*': ['email'] } };
-  databaseAdapter
-    .getAllClasses()
-    .then(allSchemas => {
-      allSchemas.forEach(schema => {
-        const className = schema.className;
-        expect(className).toEqual({
-          asymmetricMatch: className => {
-            if (!className.startsWith('_')) {
-              return true;
-            } else {
-              // Other system classes will break Parse.com, so make sure that we don't save anything to _SCHEMA that will
-              // break it.
-              return (
-                [
-                  '_User',
-                  '_Installation',
-                  '_Role',
-                  '_Session',
-                  '_Product',
-                  '_Audience',
-                  '_Idempotency',
-                ].indexOf(className) >= 0
-              );
-            }
-          },
-        });
-      });
-    })
-    .then(() => Parse.User.logOut())
-    .then(
-      () => {},
-      () => {}
-    ) // swallow errors
-    .then(() => {
-      // Connection close events are not immediate on node 10+... wait a bit
-      return new Promise(resolve => {
-        setTimeout(resolve, 0);
-      });
-    })
-    .then(afterLogOut);
+  const allSchemas = await databaseAdapter.getAllClasses();
+  allSchemas.forEach(schema => {
+    const className = schema.className;
+    expect(className).toEqual({
+      asymmetricMatch: className => {
+        if (!className.startsWith('_')) {
+          return true;
+        } else {
+          // Other system classes will break Parse.com, so make sure that we don't save anything to _SCHEMA that will
+          // break it.
+          return (
+            [
+              '_User',
+              '_Installation',
+              '_Role',
+              '_Session',
+              '_Product',
+              '_Audience',
+              '_Idempotency',
+            ].indexOf(className) >= 0
+          );
+        }
+      },
+    });
+  });
+  await Parse.User.logOut();
+  if (Object.keys(openConnections).length > 0) {
+    console.warn(`There were ${Object.keys(openConnections).length} open connections to the server left after the test finished`);
+  }
+  await TestUtils.destroyAllDataPermanently(true);
+  SchemaCache.clear();
+  if (didChangeConfiguration) {
+    await reconfigureServer();
+  } else {
+    await databaseAdapter.performInitialization({ VolatileClassesSchemas });
+  }
 });
 
 const TestObject = Parse.Object.extend({
