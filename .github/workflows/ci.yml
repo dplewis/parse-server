@@ -9,7 +9,7 @@ on:
       - '**/**.md'
 env:
   NODE_VERSION: 20.12.0
-  PARSE_SERVER_TEST_TIMEOUT: 20000
+  PARSE_SERVER_TEST_TIMEOUT: 10000
 jobs:
   check-code-analysis:
     name: Code Analysis

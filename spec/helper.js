@@ -138,6 +138,7 @@ const defaultConfiguration = {
     shortLivedAuth: mockShortLivedAuth(),
   },
   allowClientClassCreation: true,
+  encodeParseObjectInCloudFunction: true,
 };
 
 if (silent) {
@@ -173,7 +174,7 @@ let didChangeConfiguration = false;
 const reconfigureServer = async (changedConfiguration = {}) => {
   if (parseServer) {
     destroyAliveConnections();
-    await parseServer.handleShutdown();
+    // await parseServer.handleShutdown();
     await new Promise(resolve => parseServer.server.close(resolve));
     parseServer = undefined;
     return reconfigureServer(changedConfiguration);
@@ -225,15 +226,11 @@ beforeAll(async () => {
   Parse.serverURL = 'http://localhost:' + port + '/1';
 });
 
-beforeEach(() => {
-  jasmine.DEFAULT_TIMEOUT_INTERVAL = process.env.PARSE_SERVER_TEST_TIMEOUT || 10000;
-});
-
 afterEach(function (done) {
   const afterLogOut = async () => {
-    if (Object.keys(openConnections).length > 0) {
-      console.warn('There were open connections to the server left after the test finished');
-    }
+    // if (Object.keys(openConnections).length > 0) {
+    //   console.warn('There were open connections to the server left after the test finished');
+    // }
     await TestUtils.destroyAllDataPermanently(true);
     SchemaCache.clear();
     if (didChangeConfiguration) {
