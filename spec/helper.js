@@ -227,9 +227,9 @@ beforeEach(() => {
 afterEach(function (done) {
   const afterLogOut = async () => {
     if (Object.keys(openConnections).length > 0) {
-      console.warn('There were open connections to the server left after the test finished');
+      console.warn(`There were ${Object.keys(openConnections).length} open connections to the server left after the test finished`);
     }
-    destroyAliveConnections();
+    // destroyAliveConnections();
     await TestUtils.destroyAllDataPermanently(true);
     SchemaCache.clear();
     if (didChangeConfiguration) {
