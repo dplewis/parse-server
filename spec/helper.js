@@ -180,6 +180,12 @@ const reconfigureServer = async (changedConfiguration = {}) => {
   });
   cache.clear();
   const parseServer = await ParseServer.startApp(newConfiguration);
+  console.log(parseServer.config.state);
+  if (parseServer.config.state === 'initialized') {
+    console.log(newConfiguration);
+    console.error('Failed to initialize Parse Server');
+    return reconfigureServer(newConfiguration);
+  }
   server = parseServer.server;
   Parse.CoreManager.setRESTController(RESTController);
   parseServer.expressApp.use('/1', err => {
