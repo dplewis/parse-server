@@ -603,6 +603,20 @@ describe('Parse.Object testing', () => {
     expect(result.get('items')).toEqual(obj.get('items'));
   });
 
+  fit('can perform array operations with dot notation', async () => {
+    const obj = new TestObject();
+    obj.set('items', [[5, 10, 15]]);
+    await obj.save();
+    // obj.add('items.0', 20);
+    // console.log('lewis was here');
+    // await obj.save();
+    expect(obj.get('items')).toEqual([5, 10, 15, 20]);
+    // obj.add('items.0', 10);
+    // await obj.save();
+    // expect(obj.get('items')).toEqual([[5, 10]]);
+    console.log(obj.toJSON());
+  });
+
   it('can query array nested fields', async () => {
     const objects = [];
     for (let i = 0; i < 10; i++) {

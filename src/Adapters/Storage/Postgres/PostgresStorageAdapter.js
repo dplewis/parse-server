@@ -175,11 +175,15 @@ const toPostgresSchema = schema => {
   return schema;
 };
 
+// Used for Dot Notation on Arrays e.g. 'array.index'
 const isArrayIndex = (arrayIndex) => Array.from(arrayIndex).every(c => c >= '0' && c <= '9');
 
 const handleDotFields = object => {
   Object.keys(object).forEach(fieldName => {
     if (fieldName.indexOf('.') > -1) {
+      if (isArrayIndex(fieldName.split('.')[1])) {
+        return;
+      }
       const components = fieldName.split('.');
       const first = components.shift();
       object[first] = object[first] || {};
@@ -1200,6 +1204,7 @@ export class PostgresStorageAdapter implements StorageAdapter {
     const now = new Date().getTime();
     const helpers = this._pgp.helpers;
     debug('deleteAllClasses');
+    return;
     if (this._client?.$pool.ended) {
       return;
     }
@@ -1568,7 +1573,6 @@ export class PostgresStorageAdapter implements StorageAdapter {
         update['authData'][provider] = value;
       }
     }
-
     for (const fieldName in update) {
       const fieldValue = update[fieldName];
       // Drop any undefined values.
@@ -1608,23 +1612,41 @@ export class PostgresStorageAdapter implements StorageAdapter {
         values.push(fieldName, fieldValue.amount);
         index += 2;
       } else if (fieldValue.__op === 'Add') {
-        updatePatterns.push(
-          `$${index}:name = array_add(COALESCE($${index}:name, '[]'::jsonb), $${index + 1}::jsonb)`
-        );
-        values.push(fieldName, JSON.stringify(fieldValue.objects));
-        index += 2;
+        if (fieldName.includes('.')) {
+          updatePatterns.push(
+            `$${index}:name = array_add(COALESCE(($${index + 1}:raw)::jsonb, '[[]]'::jsonb), $${index + 2}::jsonb)`
+          );
+          values.push(fieldName.split('.')[0], transformDotField(fieldName), JSON.stringify(fieldValue.objects));
+          index += 3;
+        } else {
+          updatePatterns.push(
+            `$${index}:name = array_add(COALESCE($${index}:name, '[]'::jsonb), $${index + 1}::jsonb)`
+          );
+          values.push(transformDotField(fieldName), JSON.stringify(fieldValue.objects));
+          index += 2;
+        }
       } else if (fieldValue.__op === 'Delete') {
         updatePatterns.push(`$${index}:name = $${index + 1}`);
         values.push(fieldName, null);
         index += 2;
       } else if (fieldValue.__op === 'Remove') {
-        updatePatterns.push(
-          `$${index}:name = array_remove(COALESCE($${index}:name, '[]'::jsonb), $${
-            index + 1
-          }::jsonb)`
-        );
-        values.push(fieldName, JSON.stringify(fieldValue.objects));
-        index += 2;
+        if (fieldName.includes('.')) {
+          updatePatterns.push(
+            `$${index}:name = array_remove(COALESCE(($${index + 1}:raw)::jsonb, '[]'::jsonb), $${
+              index + 2
+            }::jsonb)`
+          );
+          values.push(fieldName.split('.')[0], transformDotField(fieldName), JSON.stringify(fieldValue.objects));
+          index += 3;
+        } else {
+          updatePatterns.push(
+            `$${index}:name = array_remove(COALESCE($${index}:name, '[]'::jsonb), $${
+              index + 1
+            }::jsonb)`
+          );
+          values.push(fieldName, JSON.stringify(fieldValue.objects));
+          index += 2;
+        }
       } else if (fieldValue.__op === 'AddUnique') {
         updatePatterns.push(
           `$${index}:name = array_add_unique(COALESCE($${index}:name, '[]'::jsonb), $${
@@ -1698,7 +1720,8 @@ export class PostgresStorageAdapter implements StorageAdapter {
             );
           })
           .map(k => k.split('.')[1]);
-
+          console.error('diamond was here');
+          console.log(keysToIncrement);
         let incrementPatterns = '';
         if (keysToIncrement.length > 0) {
           incrementPatterns =
@@ -1781,6 +1804,8 @@ export class PostgresStorageAdapter implements StorageAdapter {
 
     const whereClause = where.pattern.length > 0 ? `WHERE ${where.pattern}` : '';
     const qs = `UPDATE $1:name SET ${updatePatterns.join()} ${whereClause} RETURNING *`;
+    console.log(qs);
+    console.log(values);
     const promise = (transactionalSession ? transactionalSession.t : this._client).any(qs, values);
     if (transactionalSession) {
       transactionalSession.batch.push(promise);
