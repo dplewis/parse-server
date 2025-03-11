@@ -163,10 +163,10 @@ const openConnections = new Connections();
 const shutdownServer = async (_parseServer) => {
   await _parseServer.handleShutdown();
   // Connection close events are not immediate on node 10+, so wait a bit
-  await sleep(100);
+  await sleep(0);
   // Jasmine process counts as one open connection 
   const connectionMessage = `There were ${openConnections.count()} open connections to the server left after the test finished`;
-  expect(openConnections.count() > 1).toBeFalsy(connectionMessage);
+  expect(openConnections.count() > 0).toBeFalsy(connectionMessage);
   parseServer = undefined;
 };
 
