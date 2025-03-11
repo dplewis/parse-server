@@ -5,7 +5,7 @@ const Parse = require('parse/node');
 const CurrentSpecReporter = require('./support/CurrentSpecReporter.js');
 const { SpecReporter } = require('jasmine-spec-reporter');
 const SchemaCache = require('../lib/Adapters/Cache/SchemaCache').default;
-const { resolvingPromise, sleep, Connections } = require('../lib/TestUtils');
+const { resolvingPromise, sleep, Connections, getConnectionsCount } = require('../lib/TestUtils');
 
 // Ensure localhost resolves to ipv4 address first on node v17+
 if (dns.setDefaultResultOrder) {
@@ -162,7 +162,6 @@ const openConnections = new Connections();
 
 const shutdownServer = async (_parseServer) => {
   _parseServer.handleShutdown();
-  parseServer = undefined;
   // Connection close events are not immediate on node 10+, so wait a bit
   await sleep(0);
   // Jasmine process counts as one open connection 
@@ -170,10 +169,13 @@ const shutdownServer = async (_parseServer) => {
   if (process.env.PARSE_SERVER_TEST_CACHE === 'redis') {
     if (openConnections.count() > 1) {
       console.log(connectionMessage);
+      const count = await getConnectionsCount(_parseServer.server);
+      expect(openConnections.count() > 1).toBeFalsy(`${connectionMessage} but there are ${count} connections in the server`);
     }
   } else {
     expect(openConnections.count() > 1).toBeFalsy(connectionMessage);
   }
+  parseServer = undefined;
 };
 
 // Allows testing specific configurations of Parse Server
