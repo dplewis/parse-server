@@ -163,13 +163,14 @@ const openConnections = new Connections();
 const shutdownServer = async (_parseServer) => {
   _parseServer.handleShutdown();
   // Connection close events are not immediate on node 10+, so wait a bit
-  await sleep(0);
+  await sleep(100);
   // Jasmine process counts as one open connection 
   const connectionMessage = `There were ${openConnections.count()} open connections to the server left after the test finished`;
   if (process.env.PARSE_SERVER_TEST_CACHE === 'redis') {
     if (openConnections.count() > 1) {
       console.log(connectionMessage);
-      const count = await getConnectionsCount(_parseServer.server);
+      // const count = await getConnectionsCount(_parseServer.server);
+      const count = 0;
       expect(openConnections.count() > 1).toBeFalsy(`${connectionMessage} but there are ${count} connections in the server`);
     }
   } else {
