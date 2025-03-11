@@ -87,7 +87,7 @@ export class RedisCacheAdapter {
   }
 
   // Used for testing
-  getAllKeys() {
+  async getAllKeys() {
     return this.client.keys('*');
   }
 }
