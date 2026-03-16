@@ -79,6 +79,9 @@ if (process.env.PARSE_SERVER_DATABASE_ADAPTER) {
   databaseAdapter = new MongoStorageAdapter({
     uri: databaseURI,
     collectionPrefix: 'test_',
+    mongoOptions: {
+      enableSchemaHooks: true,
+    },
   });
 }
 
